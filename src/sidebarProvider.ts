@@ -604,6 +604,7 @@ export class TelegramSectionViewProvider implements vscode.WebviewViewProvider, 
           '    <div><span class="label">Allowed chats</span><span class="value">' + escapeHtml(state.allowedChatIds.length === 0 ? 'All' : String(state.allowedChatIds.length)) + '</span></div>',
           '    <div><span class="label">Open chat</span><span class="value">' + (state.openChatOnMessage ? 'Enabled' : 'Disabled') + '</span></div>',
           '    <div><span class="label">Auto-reply</span><span class="value">' + (state.autoReplyEnabled ? 'Enabled' : 'Disabled') + '</span></div>',
+          '    <div><span class="label">Status updates</span><span class="value">' + (state.statusUpdatesEnabled ? 'Enabled' : 'Disabled') + '</span></div>',
           '  </div>',
           '</section>'
         ].join('');
@@ -636,6 +637,7 @@ export class TelegramSectionViewProvider implements vscode.WebviewViewProvider, 
           '      <label class="check"><input id="pollingEnabled" type="checkbox" ' + (state.pollingEnabled ? 'checked' : '') + ' /> Start polling on activate</label>',
           '      <label class="check"><input id="openChatOnMessage" type="checkbox" ' + (state.openChatOnMessage ? 'checked' : '') + ' /> Open Copilot Chat on message</label>',
           '      <label class="check"><input id="autoReplyEnabled" type="checkbox" ' + (state.autoReplyEnabled ? 'checked' : '') + ' /> Auto-reply through language model API</label>',
+          '      <label class="check"><input id="statusUpdatesEnabled" type="checkbox" ' + (state.statusUpdatesEnabled ? 'checked' : '') + ' /> Send progress updates back to Telegram</label>',
           '    </div>',
           '  </div>',
           '  <div class="actions">',
@@ -652,6 +654,7 @@ export class TelegramSectionViewProvider implements vscode.WebviewViewProvider, 
           '    <div><span class="label">Configured</span><span class="value">' + (state.configured ? 'Yes' : 'No') + '</span></div>',
           '    <div><span class="label">Allowed chats</span><span class="value">' + escapeHtml(state.allowedChatIds.length === 0 ? 'All' : String(state.allowedChatIds.length)) + '</span></div>',
           '    <div><span class="label">Auto-reply</span><span class="value">' + (state.autoReplyEnabled ? 'Enabled' : 'Disabled') + '</span></div>',
+          '    <div><span class="label">Status updates</span><span class="value">' + (state.statusUpdatesEnabled ? 'Enabled' : 'Disabled') + '</span></div>',
           '  </div>',
           '</section>'
         ].join('');
@@ -744,6 +747,7 @@ export class TelegramSectionViewProvider implements vscode.WebviewViewProvider, 
           const pollingEnabled = document.getElementById('pollingEnabled');
           const openChatOnMessage = document.getElementById('openChatOnMessage');
           const autoReplyEnabled = document.getElementById('autoReplyEnabled');
+          const statusUpdatesEnabled = document.getElementById('statusUpdatesEnabled');
 
           vscode.postMessage({
             type: 'saveConfig',
@@ -751,6 +755,7 @@ export class TelegramSectionViewProvider implements vscode.WebviewViewProvider, 
               allowedChatIds: allowedChatIds ? allowedChatIds.value.split('\\n').map((item) => item.trim()).filter(Boolean) : [],
               openChatOnMessage: Boolean(openChatOnMessage && openChatOnMessage.checked),
               autoReplyEnabled: Boolean(autoReplyEnabled && autoReplyEnabled.checked),
+              statusUpdatesEnabled: Boolean(statusUpdatesEnabled && statusUpdatesEnabled.checked),
               pollingEnabled: Boolean(pollingEnabled && pollingEnabled.checked),
               pollIntervalMs: Number((pollIntervalMs && pollIntervalMs.value) || '2000'),
               longPollTimeoutSeconds: Number((longPollTimeoutSeconds && longPollTimeoutSeconds.value) || '25')

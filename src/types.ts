@@ -38,6 +38,7 @@ export interface TelegramBridgeState {
   allowedChatIds: string[];
   openChatOnMessage: boolean;
   autoReplyEnabled: boolean;
+  statusUpdatesEnabled: boolean;
   pollingEnabled: boolean;
   pollIntervalMs: number;
   longPollTimeoutSeconds: number;
@@ -50,6 +51,7 @@ export interface SidebarConfigPayload {
   allowedChatIds: string[];
   openChatOnMessage: boolean;
   autoReplyEnabled: boolean;
+  statusUpdatesEnabled: boolean;
   pollingEnabled: boolean;
   pollIntervalMs: number;
   longPollTimeoutSeconds: number;

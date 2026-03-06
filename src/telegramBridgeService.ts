@@ -46,6 +46,7 @@ type TelegramConfig = {
   allowedChatIds: string[];
   openChatOnMessage: boolean;
   autoReplyEnabled: boolean;
+  statusUpdatesEnabled: boolean;
   promptPrefix: string;
   maxStreamItems: number;
 };
@@ -72,6 +73,7 @@ export class TelegramBridgeService implements vscode.Disposable {
     allowedChatIds: [],
     openChatOnMessage: true,
     autoReplyEnabled: false,
+    statusUpdatesEnabled: true,
     pollingEnabled: true,
     pollIntervalMs: 2000,
     longPollTimeoutSeconds: 25,
@@ -124,6 +126,7 @@ export class TelegramBridgeService implements vscode.Disposable {
     this.state.allowedChatIds = config.allowedChatIds;
     this.state.openChatOnMessage = config.openChatOnMessage;
     this.state.autoReplyEnabled = config.autoReplyEnabled;
+    this.state.statusUpdatesEnabled = config.statusUpdatesEnabled;
     this.state.lastUpdateId = this.context.globalState.get<number | null>(LAST_UPDATE_ID_KEY, null);
     this.updateModelAccess();
     this.emitState();
@@ -157,6 +160,7 @@ export class TelegramBridgeService implements vscode.Disposable {
     allowedChatIds: string[];
     openChatOnMessage: boolean;
     autoReplyEnabled: boolean;
+    statusUpdatesEnabled: boolean;
     pollingEnabled: boolean;
     pollIntervalMs: number;
     longPollTimeoutSeconds: number;
@@ -172,6 +176,11 @@ export class TelegramBridgeService implements vscode.Disposable {
       config.update(
         "autoReplyEnabled",
         payload.autoReplyEnabled,
+        vscode.ConfigurationTarget.Workspace,
+      ),
+      config.update(
+        "statusUpdatesEnabled",
+        payload.statusUpdatesEnabled,
         vscode.ConfigurationTarget.Workspace,
       ),
       config.update("pollingEnabled", payload.pollingEnabled, vscode.ConfigurationTarget.Workspace),
@@ -413,8 +422,14 @@ export class TelegramBridgeService implements vscode.Disposable {
     this.setNotice("success", `Telegram message received from ${username ?? chatId}.`);
     this.emitState();
 
+    await this.sendStatusUpdate(
+      chatId,
+      "Message received. Preparing the prompt for GitHub Copilot.",
+      username,
+    );
+
     if (this.state.openChatOnMessage) {
-      await this.openCopilotChat(prompt);
+      await this.openCopilotChat(prompt, event);
     }
 
     if (this.state.autoReplyEnabled) {
@@ -439,14 +454,27 @@ export class TelegramBridgeService implements vscode.Disposable {
     return pieces.join("\n").trim();
   }
 
-  private async openCopilotChat(prompt: string): Promise<void> {
+  private async openCopilotChat(
+    prompt: string,
+    telegramEvent?: Pick<TelegramMessageEvent, "chatId" | "username">,
+  ): Promise<void> {
     await vscode.env.clipboard.writeText(prompt);
+    await this.sendStatusUpdate(
+      telegramEvent?.chatId,
+      "Opening GitHub Copilot Chat in VS Code.",
+      telegramEvent?.username,
+    );
 
     try {
       await vscode.commands.executeCommand("workbench.action.chat.open", { query: prompt });
       this.pushEvent("system", "Copilot chat opened", "Prompt forwarded to the GitHub Copilot Chat panel.");
       this.setNotice("success", "GitHub Copilot Chat opened with the Telegram prompt.");
       this.emitState();
+      await this.sendStatusUpdate(
+        telegramEvent?.chatId,
+        "GitHub Copilot Chat was opened successfully in VS Code.",
+        telegramEvent?.username,
+      );
       return;
     } catch {
       // Fall back to opening chat without a prefilled query.
@@ -464,14 +492,25 @@ export class TelegramBridgeService implements vscode.Disposable {
         "GitHub Copilot Chat opened. The prompt was copied to the clipboard because prefilling is not supported by this build.",
       );
       this.emitState();
+      await this.sendStatusUpdate(
+        telegramEvent?.chatId,
+        "GitHub Copilot Chat was opened. The prompt was copied to the clipboard because direct prefilling is not supported in this build.",
+        telegramEvent?.username,
+      );
     } catch (error) {
-      this.setNotice("error", `Could not open GitHub Copilot Chat: ${this.getErrorMessage(error)}`);
+      const message = this.getErrorMessage(error);
+      this.setNotice("error", `Could not open GitHub Copilot Chat: ${message}`);
       this.pushEvent(
         "error",
         "Chat open failed",
-        `Could not open GitHub Copilot Chat: ${this.getErrorMessage(error)}`,
+        `Could not open GitHub Copilot Chat: ${message}`,
       );
       this.emitState();
+      await this.sendStatusUpdate(
+        telegramEvent?.chatId,
+        `Could not open GitHub Copilot Chat: ${message}`,
+        telegramEvent?.username,
+      );
     }
   }
 
@@ -481,6 +520,8 @@ export class TelegramBridgeService implements vscode.Disposable {
     username?: string,
   ): Promise<void> {
     try {
+      await this.sendStatusUpdate(chatId, "Generating an automatic reply with GitHub Copilot.", username);
+
       const models = await vscode.lm.selectChatModels({ vendor: "copilot" });
       const model = models[0];
       if (!model) {
@@ -532,6 +573,7 @@ export class TelegramBridgeService implements vscode.Disposable {
       this.setNotice("error", message);
       this.pushEvent("error", "Auto-reply failed", message, chatId, username);
       this.emitState();
+      await this.sendStatusUpdate(chatId, `Automatic reply failed: ${message}`, username);
     }
   }
 
@@ -553,6 +595,39 @@ export class TelegramBridgeService implements vscode.Disposable {
         text,
       }),
     );
+    this.state.lastOutboundAt = Date.now();
+  }
+
+  private async sendStatusUpdate(
+    chatId: string | undefined,
+    message: string,
+    username?: string,
+  ): Promise<void> {
+    if (!chatId || !this.state.statusUpdatesEnabled) {
+      return;
+    }
+
+    try {
+      await this.sendTelegramMessage(chatId, `Bot status: ${message}`);
+      this.pushEvent(
+        "outbound",
+        username ? `Status sent to ${username}` : `Status sent to ${chatId}`,
+        message,
+        chatId,
+        username,
+      );
+      this.emitState();
+    } catch (error) {
+      const errorMessage = this.getErrorMessage(error);
+      this.pushEvent(
+        "error",
+        "Status update failed",
+        errorMessage,
+        chatId,
+        username,
+      );
+      this.output.appendLine(`[error] Failed to send Telegram status update: ${errorMessage}`);
+    }
   }
 
   private async callTelegram<T>(
@@ -619,6 +694,7 @@ export class TelegramBridgeService implements vscode.Disposable {
       allowedChatIds,
       openChatOnMessage: config.get<boolean>("openChatOnMessage", true),
       autoReplyEnabled: config.get<boolean>("autoReplyEnabled", false),
+      statusUpdatesEnabled: config.get<boolean>("statusUpdatesEnabled", true),
       promptPrefix: config.get<string>("promptPrefix", "@workspace"),
       maxStreamItems: Math.max(10, config.get<number>("maxStreamItems", 100)),
     };
