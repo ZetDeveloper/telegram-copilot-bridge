@@ -1,0 +1,8 @@
+All Rights Reserved
+
+Copyright (c) 2026 jiren_developer
+
+This extension, source code, and associated files are proprietary.
+No permission is granted to use, copy, modify, merge, publish, distribute,
+sublicense, or sell copies of this software without prior written permission
+from the copyright holder.

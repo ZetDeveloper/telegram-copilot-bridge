@@ -1,0 +1,173 @@
+{
+  "name": "telegram-copilot-bridge",
+  "displayName": "Telegram Copilot Bridge",
+  "description": "Control GitHub Copilot from a Telegram bot directly inside VS Code.",
+  "version": "0.1.0",
+  "publisher": "jirendeveloper",
+  "author": {
+    "name": "jiren_developer"
+  },
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZetDeveloper/telegram-copilot-bridge.git"
+  },
+  "homepage": "https://github.com/ZetDeveloper/telegram-copilot-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/ZetDeveloper/telegram-copilot-bridge/issues"
+  },
+  "preview": true,
+  "pricing": "Free",
+  "qna": "marketplace",
+  "markdown": "github",
+  "galleryBanner": {
+    "color": "#183A4A",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.98.0"
+  },
+  "categories": [
+    "Other",
+    "Chat"
+  ],
+  "keywords": [
+    "telegram",
+    "github copilot",
+    "copilot",
+    "bot",
+    "automation",
+    "chat",
+    "assistant"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "telegramCopilot.startPolling",
+        "title": "Telegram Copilot: Start Polling"
+      },
+      {
+        "command": "telegramCopilot.stopPolling",
+        "title": "Telegram Copilot: Stop Polling"
+      },
+      {
+        "command": "telegramCopilot.probeBot",
+        "title": "Telegram Copilot: Probe Bot"
+      },
+      {
+        "command": "telegramCopilot.setBotToken",
+        "title": "Telegram Copilot: Set Bot Token"
+      },
+      {
+        "command": "telegramCopilot.clearBotToken",
+        "title": "Telegram Copilot: Clear Bot Token"
+      },
+      {
+        "command": "telegramCopilot.clearStream",
+        "title": "Telegram Copilot: Clear Event Stream"
+      },
+      {
+        "command": "telegramCopilot.openLastPrompt",
+        "title": "Telegram Copilot: Open Last Prompt"
+      },
+      {
+        "command": "telegramCopilot.showLogs",
+        "title": "Telegram Copilot: Show Logs"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "telegramCopilot",
+          "title": "Telegram Copilot",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "telegramCopilot": [
+        {
+          "type": "webview",
+          "id": "telegramCopilot.overview",
+          "name": "Overview"
+        },
+        {
+          "type": "webview",
+          "id": "telegramCopilot.config",
+          "name": "Telegram Config"
+        },
+        {
+          "type": "webview",
+          "id": "telegramCopilot.activity",
+          "name": "Activity"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Telegram Copilot Bridge",
+      "properties": {
+        "telegramCopilot.pollingEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start Telegram polling automatically when the extension activates and a token exists."
+        },
+        "telegramCopilot.pollIntervalMs": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 250,
+          "description": "Delay between polling cycles after each Telegram getUpdates request finishes."
+        },
+        "telegramCopilot.longPollTimeoutSeconds": {
+          "type": "number",
+          "default": 25,
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Telegram long polling timeout in seconds."
+        },
+        "telegramCopilot.allowedChatIds": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional allowlist of Telegram chat ids. Empty means accept any chat."
+        },
+        "telegramCopilot.openChatOnMessage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open GitHub Copilot Chat when a Telegram message arrives."
+        },
+        "telegramCopilot.autoReplyEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Try to generate an automatic reply through the VS Code language model API and send it back to Telegram."
+        },
+        "telegramCopilot.promptPrefix": {
+          "type": "string",
+          "default": "@workspace",
+          "description": "Prefix added to prompts forwarded to Copilot Chat."
+        },
+        "telegramCopilot.maxStreamItems": {
+          "type": "number",
+          "default": 100,
+          "minimum": 10,
+          "maximum": 500,
+          "description": "Maximum number of activity events kept in the sidebar stream."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package:vsix": "npx @vscode/vsce package",
+    "publish:marketplace": "npx @vscode/vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/vscode": "^1.98.0",
+    "typescript": "^5.8.2"
+  }
+}
