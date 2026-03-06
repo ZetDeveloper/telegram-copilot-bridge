@@ -39,6 +39,10 @@ type TelegramGetMeResult = {
   username?: string;
 };
 
+type TelegramSendMessageResult = {
+  message_id: number;
+};
+
 type TelegramConfig = {
   pollingEnabled: boolean;
   pollIntervalMs: number;
@@ -545,9 +549,19 @@ export class TelegramBridgeService implements vscode.Disposable {
       );
 
       let text = "";
+      let streamedMessageId: number | undefined;
+      let lastStreamPublishAt = 0;
+      let lastStreamLength = 0;
+
       for await (const part of response.stream) {
         if (part instanceof vscode.LanguageModelTextPart) {
           text += part.value;
+
+          if (this.state.statusUpdatesEnabled && this.shouldPublishStreamUpdate(text, lastStreamPublishAt, lastStreamLength)) {
+            streamedMessageId = await this.upsertTelegramReplyDraft(chatId, text, streamedMessageId);
+            lastStreamPublishAt = Date.now();
+            lastStreamLength = text.length;
+          }
         }
       }
 
@@ -556,7 +570,11 @@ export class TelegramBridgeService implements vscode.Disposable {
         throw new Error("The language model returned an empty reply.");
       }
 
-      await this.sendTelegramMessage(chatId, normalized);
+      if (streamedMessageId) {
+        await this.editTelegramMessage(chatId, streamedMessageId, this.formatTelegramReply(normalized, true));
+      } else {
+        await this.sendTelegramMessage(chatId, normalized);
+      }
       this.state.lastOutboundAt = Date.now();
       this.setNotice("success", `Reply sent to ${username ?? chatId}.`);
       this.pushEvent(
@@ -585,7 +603,7 @@ export class TelegramBridgeService implements vscode.Disposable {
 
   private async sendTelegramMessage(chatId: string, text: string): Promise<void> {
     const token = await this.getRequiredToken();
-    await this.callTelegram(
+    await this.callTelegram<TelegramSendMessageResult>(
       token,
       "sendMessage",
       undefined,
@@ -596,6 +614,81 @@ export class TelegramBridgeService implements vscode.Disposable {
       }),
     );
     this.state.lastOutboundAt = Date.now();
+  }
+
+  private async upsertTelegramReplyDraft(
+    chatId: string,
+    text: string,
+    messageId?: number,
+  ): Promise<number> {
+    const formatted = this.formatTelegramReply(text, false);
+    if (messageId) {
+      await this.editTelegramMessage(chatId, messageId, formatted);
+      return messageId;
+    }
+
+    return this.sendTelegramMessageWithId(chatId, formatted);
+  }
+
+  private async sendTelegramMessageWithId(chatId: string, text: string): Promise<number> {
+    const token = await this.getRequiredToken();
+    const result = await this.callTelegram<TelegramSendMessageResult>(
+      token,
+      "sendMessage",
+      undefined,
+      undefined,
+      JSON.stringify({
+        chat_id: chatId,
+        text,
+      }),
+    );
+    this.state.lastOutboundAt = Date.now();
+    return result.message_id;
+  }
+
+  private async editTelegramMessage(chatId: string, messageId: number, text: string): Promise<void> {
+    const token = await this.getRequiredToken();
+    await this.callTelegram(
+      token,
+      "editMessageText",
+      undefined,
+      undefined,
+      JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        text,
+      }),
+    );
+    this.state.lastOutboundAt = Date.now();
+  }
+
+  private shouldPublishStreamUpdate(
+    text: string,
+    lastPublishedAt: number,
+    lastPublishedLength: number,
+  ): boolean {
+    const now = Date.now();
+    return (
+      text.length >= 40 && (
+        lastPublishedAt === 0 ||
+        now - lastPublishedAt >= 1500 ||
+        text.length - lastPublishedLength >= 160 ||
+        text.endsWith("\n\n")
+      )
+    );
+  }
+
+  private formatTelegramReply(text: string, isFinal: boolean): string {
+    const header = isFinal ? "Copilot reply:\n\n" : "Copilot reply (streaming):\n\n";
+    const maxLength = 3900;
+    const available = Math.max(0, maxLength - header.length);
+    const normalized = text.trim();
+
+    if (normalized.length <= available) {
+      return `${header}${normalized}`;
+    }
+
+    return `${header}${normalized.slice(0, Math.max(0, available - 14))}\n\n[truncated]`;
   }
 
   private async sendStatusUpdate(

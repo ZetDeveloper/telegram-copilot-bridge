@@ -2,7 +2,7 @@
   "name": "telegram-copilot-bridge",
   "displayName": "Telegram Copilot Bridge",
   "description": "Control GitHub Copilot from a Telegram bot directly inside VS Code.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "jirendeveloper",
   "author": {
     "name": "jiren_developer"
